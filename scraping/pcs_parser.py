@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from procyclingstats import Race, RaceClimbs, Ranking, Rider, Stage
+from procyclingstats import Race, RaceClimbs, RaceStartlist, Ranking, Rider, Stage
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +187,29 @@ def get_race_climbs(url: str, html: str) -> list[dict]:
             "km_before_finish": c.get("km_before_finnish") or c.get("km_before_finish"),
         }
         for c in raw_climbs
+    ]
+
+
+def get_race_startlist(url: str, html: str) -> list[dict]:
+    """Who's registered for a race/season - not who finished a stage.
+
+    Distinct from stage_results (see get_stage_results): a startlist
+    includes DNS/DNF riders and, for future races, is the only source of
+    "who's racing this edition" before any stage has happened.
+    """
+    startlist = RaceStartlist(url, html=html, update_html=False)
+    raw = _safe_call(startlist, "startlist") or []
+    return [
+        {
+            "rider_name": r.get("rider_name"),
+            "rider_url": r.get("rider_url"),
+            "team_name": r.get("team_name"),
+            "team_url": r.get("team_url"),
+            "nationality": r.get("nationality"),
+            "rider_number": r.get("rider_number"),
+        }
+        for r in raw
+        if r.get("rider_url")
     ]
 
 

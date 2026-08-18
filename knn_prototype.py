@@ -27,18 +27,23 @@ from scraping import db
 FEATURE_COLUMNS = [
     "distance_km",
     "vertical_meters",
-    "climb_ratio",       # vertical_meters per km - how "mountainous" the stage is
+    "climb_ratio",              # vertical_meters per km - how "mountainous" the stage is
     "profile_score",
     "nb_climbs",
-    "nb_hard_climbs",    # category 1 or HC climbs
+    "nb_hard_climbs",           # category 1 or HC climbs
+    "max_altitude",             # highest climb summit on the route, meters
+    "avg_steepness_pct",        # mean gradient across climbs with known steepness
+    "km_last_climb_to_finish",  # gap between the last climb and the line - 0 = summit finish
 ]
 
 
 def load_stage_vectors() -> pd.DataFrame:
     """Pull every synced stage into a feature DataFrame.
 
-    nb_hard_climbs comes from a join against stage_climbs rather than a
-    stored column, since it's a derived count, not raw scraped data.
+    nb_hard_climbs/max_altitude/avg_steepness_pct/km_last_climb_to_finish
+    come from stage_climbs (see enrich_climbs.py for how length/steepness/
+    elevation get populated there) rather than stored columns on
+    stage_profiles, since they're derived, not raw scraped fields.
     """
     query = """
         SELECT
@@ -53,18 +58,37 @@ def load_stage_vectors() -> pd.DataFrame:
             sp.profile_icon,
             sp.nb_climbs,
             sp.victory_type,
-            COUNT(sc.id) FILTER (WHERE sc.category IN ('1', 'HC')) AS nb_hard_climbs
+            agg.nb_hard_climbs,
+            agg.max_altitude,
+            agg.avg_steepness_pct,
+            last_climb.km_before_finish AS km_last_climb_to_finish
         FROM stage_profiles sp
-        LEFT JOIN stage_climbs sc ON sc.stage_profile_id = sp.id
+        LEFT JOIN LATERAL (
+            SELECT
+                COUNT(*) FILTER (WHERE category IN ('1', 'HC')) AS nb_hard_climbs,
+                MAX(top_elevation_m) AS max_altitude,
+                AVG(steepness_pct) AS avg_steepness_pct
+            FROM stage_climbs WHERE stage_profile_id = sp.id
+        ) agg ON true
+        LEFT JOIN LATERAL (
+            SELECT km_before_finish FROM stage_climbs
+            WHERE stage_profile_id = sp.id
+            ORDER BY climb_order DESC LIMIT 1
+        ) last_climb ON true
         WHERE sp.distance_km IS NOT NULL
           AND sp.vertical_meters IS NOT NULL
           AND sp.profile_score IS NOT NULL
-        GROUP BY sp.id
     """
     with db.get_connection() as conn:
         df = pd.read_sql(query, conn)
 
     df["climb_ratio"] = df["vertical_meters"] / df["distance_km"].replace(0, pd.NA)
+    # Flat/no-climb stages legitimately have no climb data - fill rather
+    # than drop, or the k-NN would lose every sprint stage from the pool.
+    df["max_altitude"] = df["max_altitude"].fillna(0)
+    df["avg_steepness_pct"] = df["avg_steepness_pct"].fillna(0)
+    df["km_last_climb_to_finish"] = df["km_last_climb_to_finish"].fillna(df["distance_km"])
+
     df = df.dropna(subset=FEATURE_COLUMNS)
     return df.reset_index(drop=True)
 

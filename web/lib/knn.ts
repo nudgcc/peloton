@@ -15,6 +15,9 @@ export type StageVector = {
   profile_score: number;
   nb_climbs: number;
   nb_hard_climbs: number;
+  max_altitude: number;
+  avg_steepness_pct: number;
+  km_last_climb_to_finish: number;
   victory_type: string | null;
 };
 
@@ -27,27 +30,53 @@ const FEATURES = [
   "profile_score",
   "nb_climbs",
   "nb_hard_climbs",
+  "max_altitude",
+  "avg_steepness_pct",
+  "km_last_climb_to_finish",
 ] as const;
 
 type FeatureRow = StageVector & { climb_ratio: number };
 
 async function loadStageVectors(): Promise<FeatureRow[]> {
-  const { rows } = await pool.query<StageVector>(
+  const { rows } = await pool.query<
+    Omit<StageVector, "max_altitude" | "avg_steepness_pct" | "km_last_climb_to_finish"> & {
+      max_altitude: number | null;
+      avg_steepness_pct: number | null;
+      km_last_climb_to_finish: number | null;
+    }
+  >(
     `SELECT
        sp.id, sp.pcs_url, sp.race_name, sp.season, sp.stage_number,
        sp.distance_km::float8 AS distance_km, sp.vertical_meters,
        sp.profile_score, sp.nb_climbs, sp.victory_type,
-       COUNT(sc.id) FILTER (WHERE sc.category IN ('1', 'HC'))::int AS nb_hard_climbs
+       agg.nb_hard_climbs, agg.max_altitude, agg.avg_steepness_pct::float8 AS avg_steepness_pct,
+       last_climb.km_before_finish AS km_last_climb_to_finish
      FROM stage_profiles sp
-     LEFT JOIN stage_climbs sc ON sc.stage_profile_id = sp.id
+     LEFT JOIN LATERAL (
+       SELECT
+         COUNT(*) FILTER (WHERE category IN ('1', 'HC'))::int AS nb_hard_climbs,
+         MAX(top_elevation_m) AS max_altitude,
+         AVG(steepness_pct) AS avg_steepness_pct
+       FROM stage_climbs WHERE stage_profile_id = sp.id
+     ) agg ON true
+     LEFT JOIN LATERAL (
+       SELECT km_before_finish::float8 AS km_before_finish FROM stage_climbs
+       WHERE stage_profile_id = sp.id
+       ORDER BY climb_order DESC LIMIT 1
+     ) last_climb ON true
      WHERE sp.distance_km IS NOT NULL
        AND sp.vertical_meters IS NOT NULL
-       AND sp.profile_score IS NOT NULL
-     GROUP BY sp.id`
+       AND sp.profile_score IS NOT NULL`
   );
 
   return rows
-    .map((r) => ({ ...r, climb_ratio: r.vertical_meters / r.distance_km }))
+    .map((r) => ({
+      ...r,
+      climb_ratio: r.vertical_meters / r.distance_km,
+      max_altitude: r.max_altitude ?? 0,
+      avg_steepness_pct: r.avg_steepness_pct ?? 0,
+      km_last_climb_to_finish: r.km_last_climb_to_finish ?? r.distance_km,
+    }))
     .filter((r) => Number.isFinite(r.climb_ratio));
 }
 

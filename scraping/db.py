@@ -189,6 +189,48 @@ def save_raw_page(conn, url: str, html: str) -> Optional[int]:
     return raw_page_id
 
 
+def upsert_race_startlist(
+    conn, race_slug: str, season: int, race_name: str | None, riders: list[dict]
+) -> int:
+    """Replace the startlist for one race/season. Returns rows written."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM race_startlists WHERE race_slug = %s AND season = %s",
+            (race_slug, season),
+        )
+        if not riders:
+            conn.commit()
+            return 0
+
+        psycopg2.extras.execute_values(
+            cur,
+            """
+            INSERT INTO race_startlists (
+                race_slug, season, race_name, rider_name, rider_url,
+                team_name, team_url, nationality, rider_number
+            ) VALUES %s
+            ON CONFLICT (race_slug, season, rider_url) DO NOTHING
+            """,
+            [
+                (
+                    race_slug,
+                    season,
+                    race_name,
+                    r.get("rider_name"),
+                    r.get("rider_url"),
+                    r.get("team_name"),
+                    r.get("team_url"),
+                    r.get("nationality"),
+                    r.get("rider_number"),
+                )
+                for r in riders
+            ],
+        )
+        written = cur.rowcount
+    conn.commit()
+    return written
+
+
 def log_failure(conn, url: str, reason: str, source: str = "pcs") -> None:
     with conn.cursor() as cur:
         cur.execute(
