@@ -1,6 +1,7 @@
 import { pool } from "./db";
 
 export type Stage = {
+  id: number;
   pcs_url: string;
   race_name: string | null;
   season: number | null;
@@ -15,7 +16,7 @@ export type Stage = {
 
 export async function getStages(limit = 30): Promise<Stage[]> {
   const { rows } = await pool.query<Stage>(
-    `SELECT pcs_url, race_name, season, stage_number, distance_km,
+    `SELECT id, pcs_url, race_name, season, stage_number, distance_km,
             vertical_meters, profile_score, profile_icon,
             victory_type, winner_group_size
      FROM stage_profiles
@@ -25,6 +26,18 @@ export async function getStages(limit = 30): Promise<Stage[]> {
     [limit]
   );
   return rows;
+}
+
+export async function getStageById(id: number): Promise<Stage | null> {
+  const { rows } = await pool.query<Stage>(
+    `SELECT id, pcs_url, race_name, season, stage_number, distance_km,
+            vertical_meters, profile_score, profile_icon,
+            victory_type, winner_group_size
+     FROM stage_profiles
+     WHERE id = $1`,
+    [id]
+  );
+  return rows[0] ?? null;
 }
 
 export async function getStats() {

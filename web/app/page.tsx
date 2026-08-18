@@ -1,17 +1,7 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { getStages, getStats } from "@/lib/stages";
-
-const VICTORY_TYPE_LABELS: Record<string, string> = {
-  bunch_sprint: "Sprint massif",
-  reduced_group_sprint: "Sprint groupe réduit",
-  solo_or_breakaway: "Solo / échappée",
-};
-
-const VICTORY_TYPE_STYLES: Record<string, string> = {
-  bunch_sprint: "bg-royal-blue/10 text-royal-blue",
-  reduced_group_sprint: "bg-drift-silver text-foreground",
-  solo_or_breakaway: "bg-ion-blue/15 text-ion-blue",
-};
+import { VictoryBadge } from "@/components/VictoryBadge";
 
 export default async function Home() {
   const [stages, stats] = await Promise.all([getStages(40), getStats()]);
@@ -66,7 +56,12 @@ export default async function Home() {
                   className="border-b border-border last:border-0 hover:bg-surface"
                 >
                   <td className="px-4 py-3 font-medium text-foreground">
-                    {stage.race_name ?? "—"}{" "}
+                    <Link
+                      href={`/stages/${stage.id}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {stage.race_name ?? "—"}
+                    </Link>{" "}
                     <span className="text-muted-foreground">
                       {stage.season}
                     </span>
@@ -88,19 +83,7 @@ export default async function Home() {
                     {stage.profile_score ?? "—"}
                   </td>
                   <td className="px-4 py-3">
-                    {stage.victory_type ? (
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
-                          VICTORY_TYPE_STYLES[stage.victory_type] ??
-                          "bg-drift-silver text-foreground"
-                        }`}
-                      >
-                        {VICTORY_TYPE_LABELS[stage.victory_type] ??
-                          stage.victory_type}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    <VictoryBadge type={stage.victory_type} />
                   </td>
                 </tr>
               ))}
