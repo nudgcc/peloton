@@ -192,7 +192,12 @@ def save_raw_page(conn, url: str, html: str) -> Optional[int]:
 def upsert_race_startlist(
     conn, race_slug: str, season: int, race_name: str | None, riders: list[dict]
 ) -> int:
-    """Replace the startlist for one race/season. Returns rows written."""
+    """Replace the startlist for one race/season. Returns rows attempted.
+
+    Not cur.rowcount: execute_values batches into multiple INSERTs past
+    its default page_size (100), and rowcount only reflects the last
+    batch - see the same issue in enrich_climbs.py:apply_updates.
+    """
     with conn.cursor() as cur:
         cur.execute(
             "DELETE FROM race_startlists WHERE race_slug = %s AND season = %s",
@@ -225,10 +230,10 @@ def upsert_race_startlist(
                 )
                 for r in riders
             ],
+            page_size=len(riders),
         )
-        written = cur.rowcount
     conn.commit()
-    return written
+    return len(riders)
 
 
 def log_failure(conn, url: str, reason: str, source: str = "pcs") -> None:
