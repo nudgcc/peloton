@@ -52,6 +52,7 @@ def load_stage_vectors() -> pd.DataFrame:
             sp.profile_score,
             sp.profile_icon,
             sp.nb_climbs,
+            sp.victory_type,
             COUNT(sc.id) FILTER (WHERE sc.category IN ('1', 'HC')) AS nb_hard_climbs
         FROM stage_profiles sp
         LEFT JOIN stage_climbs sc ON sc.stage_profile_id = sp.id
@@ -115,8 +116,18 @@ def main() -> None:
             f"  [{row['distance']:.2f}] {row['race_name']} {row['season']} stage {row['stage_number']} "
             f"- distance={row['distance_km']}km vertical={row['vertical_meters']}m "
             f"profile_score={row['profile_score']} hard_climbs={row['nb_hard_climbs']} "
+            f"victory_type={row['victory_type']} "
             f"({row['pcs_url']})"
         )
+
+    classified = neighbors.dropna(subset=["victory_type"])
+    if len(classified):
+        print(f"\nScenario base rates among {len(classified)}/{len(neighbors)} classified twins:")
+        rates = classified["victory_type"].value_counts(normalize=True).sort_values(ascending=False)
+        for victory_type, rate in rates.items():
+            print(f"  {victory_type:22s} {rate:.0%}")
+    else:
+        print("\nNo classified twins (missing results data) - can't compute scenario base rates.")
 
 
 if __name__ == "__main__":
