@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #12151c;
+
+  /* Brand palette */
+  --color-royal-blue: #4a78e0; /* primary - CTAs, active states, links */
+  --color-ion-blue: #3fc4f7; /* accent - highlights, badges, data emphasis */
+  --color-drift-silver: #dde3ea; /* neutral - surfaces, borders, dividers */
+
+  --surface: #f5f7fa;
+  --border: var(--color-drift-silver);
+  --muted-foreground: #5b6472;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-royal-blue: var(--color-royal-blue);
+  --color-ion-blue: var(--color-ion-blue);
+  --color-drift-silver: var(--color-drift-silver);
+  --color-primary: var(--color-royal-blue);
+  --color-accent: var(--color-ion-blue);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b0e14;
+    --foreground: #eef1f6;
+
+    --surface: #131722;
+    --border: #232838;
+    --muted-foreground: #8b93a3;
+
+    /* Slightly brightened for contrast against a dark background. */
+    --color-royal-blue: #6690f2;
+    --color-ion-blue: #3fc4f7;
+    --color-drift-silver: #aab4c2;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
