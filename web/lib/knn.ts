@@ -21,7 +21,7 @@ export type StageVector = {
   victory_type: string | null;
 };
 
-export type Neighbor = StageVector & { distance: number };
+export type Neighbor = FeatureRow & { distance: number };
 
 const FEATURES = [
   "distance_km",
@@ -99,10 +99,35 @@ function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(a.reduce((sum, v, i) => sum + (v - b[i]) ** 2, 0));
 }
 
+// Axes chosen for the stage's "readout" radar: broad coverage of the
+// feature vector without crowding a 6-spoke chart (profile_score is a
+// PCS-derived composite of several of these, and nb_climbs/
+// km_last_climb_to_finish read better as plain numbers than radar spokes).
+export const RADAR_FEATURES = [
+  "distance_km",
+  "vertical_meters",
+  "climb_ratio",
+  "nb_hard_climbs",
+  "max_altitude",
+  "avg_steepness_pct",
+] as const;
+
+export type RadarAxis = {
+  feature: (typeof RADAR_FEATURES)[number];
+  percentile: number;
+  value: number;
+};
+
+function percentileOf(values: number[], value: number): number {
+  if (values.length <= 1) return 50;
+  const countBelow = values.filter((v) => v < value).length;
+  return Math.round((countBelow / (values.length - 1)) * 100);
+}
+
 export async function findTwinStages(
   targetId: number,
   k = 8
-): Promise<{ target: FeatureRow; neighbors: Neighbor[] } | null> {
+): Promise<{ target: FeatureRow; neighbors: Neighbor[]; radar: RadarAxis[] } | null> {
   const rows = await loadStageVectors();
   const targetIndex = rows.findIndex((r) => r.id === targetId);
   if (targetIndex === -1) return null;
@@ -119,7 +144,17 @@ export async function findTwinStages(
     .sort((a, b) => a.distance - b.distance)
     .slice(0, k);
 
-  return { target: rows[targetIndex], neighbors };
+  const target = rows[targetIndex];
+  const radar: RadarAxis[] = RADAR_FEATURES.map((feature) => ({
+    feature,
+    value: target[feature],
+    percentile: percentileOf(
+      rows.map((r) => r[feature]),
+      target[feature]
+    ),
+  }));
+
+  return { target, neighbors, radar };
 }
 
 export function scenarioBaseRates(

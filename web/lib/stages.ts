@@ -78,6 +78,29 @@ export async function getStageById(id: number): Promise<Stage | null> {
   return rows[0] ?? null;
 }
 
+export type Climb = {
+  climb_order: number;
+  climb_name: string | null;
+  category: string | null;
+  length_km: number | null;
+  top_elevation_m: number | null;
+  km_before_finish: number | null;
+};
+
+export async function getStageClimbs(stageId: number): Promise<Climb[]> {
+  const { rows } = await pool.query<Climb>(
+    `SELECT climb_order, climb_name, category,
+            length_km::float8 AS length_km,
+            top_elevation_m,
+            km_before_finish::float8 AS km_before_finish
+     FROM stage_climbs
+     WHERE stage_profile_id = $1
+     ORDER BY climb_order ASC`,
+    [stageId]
+  );
+  return rows;
+}
+
 export async function getStats() {
   const { rows } = await pool.query<{
     stage_count: string;
