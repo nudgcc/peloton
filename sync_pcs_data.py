@@ -121,6 +121,12 @@ def main() -> None:
         help="Comma-separated slug:season pairs to sync instead of scraping/races_config.py, "
         "e.g. tour-de-france:2024,giro-d-italia:2024",
     )
+    parser.add_argument(
+        "--season",
+        type=int,
+        help="Only sync races_config.py entries for this season - finished seasons never "
+        "change, so a scheduled job only needs to re-check the current one.",
+    )
     args = parser.parse_args()
 
     with contextlib.ExitStack() as stack:
@@ -136,6 +142,8 @@ def main() -> None:
             for pair in args.races.split(","):
                 slug, season = pair.split(":")
                 races.append({"slug": slug, "season": int(season)})
+        elif args.season:
+            races = [r for r in RACES_TO_SYNC if r["season"] == args.season]
         else:
             races = RACES_TO_SYNC
 

@@ -47,6 +47,11 @@ _OTHER_STAGE_RACES = [
 
 _SEASONS = [2023, 2024, 2025, 2026]
 
+# The only season a scheduled sync needs to re-check (see sync_pcs_data.py
+# --season) - past seasons are finished and don't change. Bump this once a
+# year; add the new year to _SEASONS above at the same time.
+CURRENT_SEASON = 2026
+
 RACES_TO_SYNC = [
     {"slug": slug, "season": season}
     for slug in (_GRAND_TOURS + _ONE_WEEK_RACES + _OTHER_STAGE_RACES)

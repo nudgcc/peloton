@@ -2,12 +2,17 @@ name: Sync PCS data
 
 on:
   schedule:
-    # Daily at 04:00 UTC, off-peak for procyclingstats.com
+    # Daily at 04:00 UTC - late enough that the previous day's stages
+    # (usually finishing ~14:00-17:00 UTC) have results published.
     - cron: "0 4 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
         description: "Fetch and parse without writing to Postgres"
+        type: boolean
+        default: false
+      full_resync:
+        description: "Resync every season in races_config.py, not just the current one"
         type: boolean
         default: false
 
@@ -26,12 +31,26 @@ jobs:
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
-      - name: Run sync
+      - name: Sync stage profiles/results
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          FLAGS=""
           if [ "${{ inputs.dry_run }}" = "true" ]; then
-            python sync_pcs_data.py --dry-run
-          else
-            python sync_pcs_data.py
+            FLAGS="$FLAGS --dry-run"
           fi
+          if [ "${{ inputs.full_resync }}" != "true" ]; then
+            # Keep this in sync with CURRENT_SEASON in scraping/races_config.py.
+            FLAGS="$FLAGS --season 2026"
+          fi
+          python sync_pcs_data.py $FLAGS
+
+      - name: Sync current-season startlists
+        if: ${{ inputs.dry_run != 'true' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python sync_startlists.py --races "$(python3 -c "
+          from scraping.races_config import RACES_TO_SYNC, CURRENT_SEASON
+          print(','.join(f'{r[\"slug\"]}:{r[\"season\"]}' for r in RACES_TO_SYNC if r['season'] == CURRENT_SEASON))
+          ")"
