@@ -85,9 +85,11 @@ def load_stage_vectors() -> pd.DataFrame:
     df["climb_ratio"] = df["vertical_meters"] / df["distance_km"].replace(0, pd.NA)
     # Flat/no-climb stages legitimately have no climb data - fill rather
     # than drop, or the k-NN would lose every sprint stage from the pool.
-    df["max_altitude"] = df["max_altitude"].fillna(0)
-    df["avg_steepness_pct"] = df["avg_steepness_pct"].fillna(0)
-    df["km_last_climb_to_finish"] = df["km_last_climb_to_finish"].fillna(df["distance_km"])
+    df["max_altitude"] = df["max_altitude"].astype("float64").fillna(0)
+    df["avg_steepness_pct"] = df["avg_steepness_pct"].astype("float64").fillna(0)
+    df["km_last_climb_to_finish"] = (
+        df["km_last_climb_to_finish"].astype("float64").fillna(df["distance_km"])
+    )
 
     df = df.dropna(subset=FEATURE_COLUMNS)
     return df.reset_index(drop=True)
