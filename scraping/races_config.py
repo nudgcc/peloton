@@ -45,7 +45,7 @@ _OTHER_STAGE_RACES = [
     "tour-de-l-ain",
 ]
 
-_SEASONS = [2023, 2024, 2025]
+_SEASONS = [2023, 2024, 2025, 2026]
 
 RACES_TO_SYNC = [
     {"slug": slug, "season": season}
