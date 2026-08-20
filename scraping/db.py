@@ -102,15 +102,24 @@ def upsert_stage_profile(conn, profile: dict) -> int:
         )
         stage_profile_id = cur.fetchone()[0]
 
-        cur.execute("DELETE FROM stage_climbs WHERE stage_profile_id = %s", (stage_profile_id,))
+        # Upsert rather than delete+reinsert: Stage.climbs() (what `climbs`
+        # is built from) only ever carries name/url/category - length_km/
+        # steepness_pct/top_elevation_m/km_before_finish are filled in
+        # separately by enrich_climbs.py. A blind delete+reinsert on every
+        # routine re-sync would silently wipe that enrichment back to NULL
+        # every time, so the ON CONFLICT clause only touches the columns
+        # this function actually has data for.
         if climbs:
             psycopg2.extras.execute_values(
                 cur,
                 """
                 INSERT INTO stage_climbs (
-                    stage_profile_id, climb_order, climb_name, climb_url,
-                    category, length_km, steepness_pct, top_elevation_m, km_before_finish
+                    stage_profile_id, climb_order, climb_name, climb_url, category
                 ) VALUES %s
+                ON CONFLICT (stage_profile_id, climb_order) DO UPDATE SET
+                    climb_name = EXCLUDED.climb_name,
+                    climb_url = EXCLUDED.climb_url,
+                    category = EXCLUDED.category
                 """,
                 [
                     (
@@ -119,14 +128,18 @@ def upsert_stage_profile(conn, profile: dict) -> int:
                         c.get("climb_name"),
                         c.get("climb_url"),
                         c.get("category"),
-                        c.get("length_km"),
-                        c.get("steepness_pct"),
-                        c.get("top_elevation_m"),
-                        c.get("km_before_finish"),
                     )
                     for c in climbs
                 ],
             )
+        # Clean up if this sync found fewer climbs than a previous one
+        # (route change, or a bad prior parse) - anything beyond the
+        # current climb_order range is stale.
+        max_order = max((c.get("climb_order") or 0) for c in climbs) if climbs else 0
+        cur.execute(
+            "DELETE FROM stage_climbs WHERE stage_profile_id = %s AND climb_order > %s",
+            (stage_profile_id, max_order),
+        )
 
         cur.execute("DELETE FROM stage_results WHERE stage_profile_id = %s", (stage_profile_id,))
         if results:
